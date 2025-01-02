@@ -8,30 +8,31 @@ import util
 from sklearn.metrics import brier_score_loss
 
 
-timestr = time.strftime("%Y%m%d-%H%M%S")
+timestr = time.strftime("%Y%m%d-%H%M%S")   # formats the current time into a string
 dataset = pd.read_csv('new_data/dataset.csv')
 
-test_mask = (dataset['match_id'] == 30) | (dataset['match_id'] == 34)
+test_mask = (dataset['match_id'] == 30) | (dataset['match_id'] == 34)   # creates a mask (a Boolean series) that selects rows where the match_id is either 30 or 34
 val_ratio = 0.3
 encode_columns = []
-shot_predictors = ['is_target_turn', 'aroundhead', 'backhand', 'time_proportion']
-rally_predictors = ['roundscore_diff', 'continuous_score']
+shot_predictors = ['is_target_turn', 'aroundhead', 'backhand', 'time_proportion']   # list of features
+rally_predictors = ['roundscore_diff', 'continuous_score']   # list of features
 target = 'is_target_win'
 
-seq_len = dataset.groupby('rally_id').size().max()
+seq_len = dataset.groupby('rally_id').size().max()   # computes the maximum number of shots (or events) in a rally by grouping the data by rally_id
 seq_len += 1 if seq_len % 2 == 1 else 2
 
-encoded = pd.get_dummies(dataset, columns=encode_columns)
-codes_type, uniques_type = pd.factorize(encoded['type'])
+encoded = pd.get_dummies(dataset, columns=encode_columns)  # encode_columns is empty, so no columns are encoded by default
+codes_type, uniques_type = pd.factorize(encoded['type'])  # encode the type column into numeric labels, storing the unique values in uniques_type
 encoded['type'] = codes_type + 1  # Reserve code 0 for paddings
 
-shot_predictors = [c for c in encoded.columns if any(c.startswith(f'{p}_')for p in shot_predictors) or c in shot_predictors]
+shot_predictors = [c for c in encoded.columns if any(c.startswith(f'{p}_')for p in shot_predictors) or c in shot_predictors]   # filters columns in the encoded dataset, selecting those that are either explicitly in shot_predictors or start with any of the shot predictors.
 train_data, val_data, test_data = train.split_data(encoded, val_ratio=val_ratio, test_mask=test_mask)
 
 (train_shots, train_shot_types), (train_rallies, train_target, train_rally_id) = train.prepare_data(train_data, [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], [rally_predictors, target, 'rally_id'], pad_to=seq_len)
+# ensures that sequences (e.g., rallies) are padded to the specified length (seq_len)
 
 (val_shots, val_shot_types), (val_rallies, val_target, val_rally_id) = train.prepare_data(val_data, [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], [rally_predictors, target, 'rally_id'], pad_to=seq_len)
-seq_len = train_shots.shape[1]
+seq_len = train_shots.shape[1]  # match the number of time steps (shots) in the training data
 
 train_hit_area_encoded = train_shot_types[:, :, 0].copy()
 train_player_area_encoded = train_shot_types[:, :, 1].copy()
