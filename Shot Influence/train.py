@@ -16,8 +16,8 @@ def split_data(dataset: pd.DataFrame,
     non_test = dataset[~test_mask]
     groups = non_test['rally_id'].unique()
     ngroup = len(groups)
-    val_groups = np.random.choice(groups, int(ngroup * val_ratio))
-    val_mask = non_test['rally_id'].isin(val_groups)
+    val_groups = np.random.choice(groups, int(ngroup * val_ratio))    # selects int(ngroup * val_ratio) unique groups randomly from the groups array
+    val_mask = non_test['rally_id'].isin(val_groups)    # creates a boolean mask 
     val = non_test[val_mask]
     train = non_test[~val_mask]
     return train, val, test
@@ -31,22 +31,23 @@ def prepare_data(dataset: pd.DataFrame,
                  ) -> Tuple[Union[np.ndarray, List[np.ndarray]],
                             Union[np.ndarray, List[np.ndarray]]]:
     """Convert dataset to appropriate format for training."""
+    # pad-to = sequence length to which the shot sequences will be padded to ensure that all sequences are the same length
     shots = []
     rallies = []
-    shot_attributes_f = util.flatten(shot_attributes)
+    shot_attributes_f = util.flatten(shot_attributes)    # convert into flat list
     rally_attributes_f = util.flatten(rally_attributes)
     
     # Generate sequences of rallies
     for rally_id, rally in dataset.groupby('rally_id'):
         if min_len > 0 and len(rally) < min_len:
-            continue
-        shots.append(rally[shot_attributes_f].values.astype('float32'))
-        rallies.append(rally[rally_attributes_f].values[-1].astype('float32'))
+            continue    # skip ralies with length smaller than min_len
+        shots.append(rally[shot_attributes_f].values.astype('float32'))     # append values of valid rallies to the list
+        rallies.append(rally[rally_attributes_f].values[-1].astype('float32'))    # append last value of each rally's attributes
         # Force non-target's sequence starts at second step
         pad = ((0, pad_to - len(rally)) if rally['is_target_turn'].iloc[0]
-               else (1, pad_to - len(rally) - 1))
+               else (1, pad_to - len(rally) - 1))    # if 1st row of the rally indicates that it's the target's turn, the sequence is padded at the end to reach the pad_to length
         shots[-1] = np.pad(shots[-1], [pad, (0, 0)])
-    shots = np.asarray(shots)
+    shots = np.asarray(shots)    # convert to numpy arrays
     rallies = np.asarray(rallies)
 
     # Split back to input specification
