@@ -67,9 +67,10 @@ def bad_net(shot_sequence_shape: Tuple[int, int],
     
     # Extract local shot patterns
     layer_cnn = custom_layers.StaggeredConv1D(name='Local_pattern_extration', **cnn_kwargs)
+    # Extract long-term relationships from the shot pattern sequences
     layer_rnn = tf.keras.layers.Bidirectional(
         tf.keras.layers.GRU(return_sequences=True, **rnn_kwargs), name='Bidirectional_recurrent_layer')
-    layer_concat_cnn_rnn = tf.keras.layers.Concatenate(name='Patterns_states_merging')
+    layer_concat_cnn_rnn = tf.keras.layers.Concatenate(name='Patterns_states_merging')            # concate short-term and long-term dependencies
     layer_attention = keras_self_attention.SeqWeightedAttention(return_attention=True, **attention_kwargs)
 
     if rally_info_shape is not None:
@@ -108,10 +109,10 @@ def bad_net(shot_sequence_shape: Tuple[int, int],
     hidden_states = layer_rnn(pattern_sequence)
     patterns_states = layer_concat_cnn_rnn([pattern_sequence, hidden_states])
 
-    rally_represent, contributions = layer_attention(patterns_states)
+    rally_represent, contributions = layer_attention(patterns_states)            # whole shot sequence as weighted sum of short-term & long-term dependencies
     if rally_info_shape is not None:
         inputs.append(input_rally)
-        rally_represent = layer_concat_rally([rally_represent, input_rally])
+        rally_represent = layer_concat_rally([rally_represent, input_rally])            # concate whole shot sequence & rally-level info
     output_win_prob = layer_dense(rally_represent)
 
     model_predict = tf.keras.Model(inputs=inputs, outputs=output_win_prob)
