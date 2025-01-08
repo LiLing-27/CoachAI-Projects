@@ -21,33 +21,37 @@ def bad_net(shot_sequence_shape: Tuple[int, int],
             dense_kwargs: Dict[str, Any] = {}
             ) -> tf.keras.Model:
     """Create BadNet(our proposed model) for rally classification."""
-    # Layers
+    """ shot_sequence_shape = [the number of shots, features per shot] """
+    
+    # Location embedding
     input_hit_area = tf.keras.Input(shape=shot_sequence_shape[0], name='Hit_area_input')
     input_player_area = tf.keras.Input(shape=shot_sequence_shape[0], name='Player_area_input')
     input_opponent_area = tf.keras.Input(shape=shot_sequence_shape[0], name='Opponent_area_input')
-    
+
     if embed_area_size is not None:
         area_embedding = tf.keras.layers.Embedding(input_dim=embed_area_size, output_dim=10, mask_zero=True, name='Area_embedding')
     else:
         area_embedding = None
 
-    input_shots = tf.keras.Input(shape=shot_sequence_shape, name='Shots_input')
-    shots_concat_areas = tf.keras.layers.Concatenate(name='Shots_areas_merging')
-    layer_masking = tf.keras.layers.Masking(name='Sequence_masking')
-
+    # Enhanced shot type embedding    
+    input_shots = tf.keras.Input(shape=shot_sequence_shape, name='Shots_input')             # tensor of shape (batch_size, sequence_length, num_features)
+    shots_concat_areas = tf.keras.layers.Concatenate(name='Shots_areas_merging')            # merge multiple inputs into a single tensor
+    layer_masking = tf.keras.layers.Masking(name='Sequence_masking')            # masked sequence with padding values to ignore them during training and computations
+        
     if embed_types_size:
         input_shot_types = tf.keras.Input(shape=shot_sequence_shape[0], name='Shot_types_input')
-        layer_embedding = tf.keras.layers.Embedding(input_dim=embed_types_size, output_dim=15, mask_zero=True, name='Shot_types_embedding')
-        shot_mu_embedding = tf.keras.layers.Embedding(input_dim=embed_types_size, output_dim=15, mask_zero=True, name='Time_influence_occurrence')
+        layer_embedding = tf.keras.layers.Embedding(input_dim=embed_types_size, output_dim=15, mask_zero=True, name='Shot_types_embedding')            # embed 15-dimensional vectors for each shot type
+        shot_mu_embedding = tf.keras.layers.Embedding(input_dim=embed_types_size, output_dim=15, mask_zero=True, name='Time_influence_occurrence')            # encodes the time influence of each shot type using 2 embeddings
         shot_theta_embedding = tf.keras.layers.Embedding(input_dim=embed_types_size, output_dim=15, mask_zero=True, name='Time_influence_shot')
         
-        input_time_proportion = tf.keras.Input(shape=shot_sequence_shape[0], name='Time_proportion_input')
-        time_multiplication = tf.keras.layers.Multiply(name='Time_proportion_multiply')
-        time_addition = tf.keras.layers.Add(name='Time_proportion_add')
-        time_activation = tf.keras.layers.Activation('sigmoid', name='Time_activation')
+        # Combine time proportion with 2 latent variables
+        input_time_proportion = tf.keras.Input(shape=shot_sequence_shape[0], name='Time_proportion_input')            
+        time_multiplication = tf.keras.layers.Multiply(name='Time_proportion_multiply')            # combines time proportion with embeddings for contextual weighting
+        time_addition = tf.keras.layers.Add(name='Time_proportion_add')            # adds temporal features to embeddings for enhanced modeling
+        time_activation = tf.keras.layers.Activation('sigmoid', name='Time_activation')            # temporal score
 
-        activity_embedding = tf.keras.layers.Multiply(name='Shots_time_multiply')
-        layer_concat_embedding = tf.keras.layers.Concatenate(name='Shots_features_merging')
+        activity_embedding = tf.keras.layers.Multiply(name='Shots_time_multiply')            # combines time-proportioned influences with shot type embeddings
+        layer_concat_embedding = tf.keras.layers.Concatenate(name='Shots_features_merging')            # merge all extracted features (areas, shot types, and temporal influences) into a single unified representation.
     else:
         input_shot_types = None
         layer_embedding = None
@@ -60,7 +64,8 @@ def bad_net(shot_sequence_shape: Tuple[int, int],
         time_activation = None
         activity_embedding = None
         layer_concat_embedding = None
-
+    
+    # Extract local shot patterns
     layer_cnn = custom_layers.StaggeredConv1D(name='Local_pattern_extration', **cnn_kwargs)
     layer_rnn = tf.keras.layers.Bidirectional(
         tf.keras.layers.GRU(return_sequences=True, **rnn_kwargs), name='Bidirectional_recurrent_layer')
