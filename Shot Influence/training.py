@@ -22,13 +22,28 @@ seq_len = dataset.groupby('rally_id').size().max()     # computes the maximum nu
 seq_len += 1 if seq_len % 2 == 1 else 2
 
 encoded = pd.get_dummies(dataset, columns=encode_columns)    # encode_columns is empty, so no columns are encoded by default
+# if data = {
+#     'Color': ['Red', 'Green', 'Blue', 'Red'],
+#     'Price': [10, 20, 15, 10]
+# }; then
+# encoded = Price	Blue	Green	Red	
+#             10	  0	    0	    1	
+#             20	  0	    1	    0	
+#             15	  1	    0	    0	
+#             10	  0	    0	    1
+
 codes_type, uniques_type = pd.factorize(encoded['type'])    # encode the type column into numeric labels, storing the unique values in uniques_type
-encoded['type'] = codes_type + 1    # Reserve code 0 for paddings
+encoded['type'] = codes_type + 1    # add 1 to all indexes to reserve code 0 for paddings
+# codes, uniques = pd.factorize(np.array(['b', 'b', 'a', 'c', 'b'], dtype="O"))
+#>>> codes
+#array([0, 0, 1, 2, 0])
+#>>> uniques
+#array(['b', 'a', 'c'], dtype=object)
 
 shot_predictors = [c for c in encoded.columns if any(c.startswith(f'{p}_')for p in shot_predictors) or c in shot_predictors]     # filters columns in the encoded dataset, selecting those that are either explicitly in shot_predictors or start with any of the shot predictors.
 train_data, val_data, test_data = train.split_data(encoded, val_ratio=val_ratio, test_mask=test_mask)
 
-(train_shots, train_shot_types), (train_rallies, train_target, train_rally_id) = train.prepare_data(train_data, [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], [rally_predictors, target, 'rally_id'], pad_to=seq_len)
+(train_shots, train_shot_types), (train_rallies, train_target, train_rally_id) = train.prepare_data(train_data, shot_attributes = [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], rally_attributes = [rally_predictors, target, 'rally_id'], pad_to=seq_len)
 # ensures that sequences (e.g., rallies) are padded to the specified length (seq_len)
 
 (val_shots, val_shot_types), (val_rallies, val_target, val_rally_id) = train.prepare_data(val_data, [shot_predictors, ['hit_area', 'player_location_area', 'opponent_location_area', 'type']], [rally_predictors, target, 'rally_id'], pad_to=seq_len)
